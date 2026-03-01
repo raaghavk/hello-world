@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Uptime Monitor</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">⚡ Uptime Monitor - Admin</div>
+      <div class="nav-links">
+        <a href="/dashboard.html" class="nav-link">Dashboard</a>
+        <button id="logoutBtn" class="btn btn-small">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="dashboard">
+    <div class="container">
+      <h1>Admin Panel</h1>
+
+      <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0;">
+        <div class="stat-card" style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <h3>Total Users</h3>
+          <p id="totalUsers" style="font-size: 2rem; font-weight: bold; color: #4f46e5;">-</p>
+        </div>
+        <div class="stat-card" style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <h3>Free Users</h3>
+          <p id="freeUsers" style="font-size: 2rem; font-weight: bold; color: #6b7280;">-</p>
+        </div>
+        <div class="stat-card" style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <h3>Paid Users</h3>
+          <p id="paidUsers" style="font-size: 2rem; font-weight: bold; color: #10b981;">-</p>
+        </div>
+        <div class="stat-card" style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <h3>Est. MRR</h3>
+          <p id="estimatedMRR" style="font-size: 2rem; font-weight: bold; color: #10b981;">-</p>
+        </div>
+      </div>
+
+      <div style="background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2>All Users</h2>
+        <div id="usersTable" style="overflow-x: auto; margin-top: 1rem;">
+          <div class="loading">Loading users...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let users = [];
+
+    async function checkAuth() {
+      try {
+        const response = await fetch('/api/user');
+        if (!response.ok) {
+          window.location.href = '/login.html';
+          return;
+        }
+        const user = await response.json();
+
+        // Simple admin check
+        const adminEmail = 'ADMIN_EMAIL_FROM_ENV'; // This would be set from environment
+        // For now, just load the data (in production, server should enforce this)
+        loadUsers();
+      } catch (error) {
+        window.location.href = '/login.html';
+      }
+    }
+
+    async function loadUsers() {
+      try {
+        const response = await fetch('/api/admin/users');
+        if (!response.ok) {
+          document.getElementById('usersTable').innerHTML = '<p>Access denied. Admin privileges required.</p>';
+          return;
+        }
+        users = await response.json();
+        renderStats();
+        renderUsers();
+      } catch (error) {
+        console.error('Error loading users:', error);
+      }
+    }
+
+    function renderStats() {
+      const freeCount = users.filter(u => u.plan === 'free').length;
+      const basicCount = users.filter(u => u.plan === 'basic').length;
+      const proCount = users.filter(u => u.plan === 'pro').length;
+      const mrr = (basicCount * 10) + (proCount * 20);
+
+      document.getElementById('totalUsers').textContent = users.length;
+      document.getElementById('freeUsers').textContent = freeCount;
+      document.getElementById('paidUsers').textContent = basicCount + proCount;
+      document.getElementById('estimatedMRR').textContent = '$' + mrr;
+    }
+
+    function renderUsers() {
+      const html = `
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background: #f3f4f6; text-align: left;">
+              <th style="padding: 0.75rem;">ID</th>
+              <th style="padding: 0.75rem;">Email</th>
+              <th style="padding: 0.75rem;">Plan</th>
+              <th style="padding: 0.75rem;">Status</th>
+              <th style="padding: 0.75rem;">Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(user => `
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.75rem;">${user.id}</td>
+                <td style="padding: 0.75rem;">${user.email}</td>
+                <td style="padding: 0.75rem;">
+                  <span class="badge" style="background: ${user.plan === 'free' ? '#6b7280' : user.plan === 'basic' ? '#4f46e5' : '#10b981'}">
+                    ${user.plan.toUpperCase()}
+                  </span>
+                </td>
+                <td style="padding: 0.75rem;">${user.subscription_status || 'N/A'}</td>
+                <td style="padding: 0.75rem;">${new Date(user.created_at).toLocaleDateString()}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      document.getElementById('usersTable').innerHTML = html;
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('/api/logout', { method: 'POST' });
+      window.location.href = '/';
+    });
+
+    checkAuth();
+  </script>
+</body>
+</html>
